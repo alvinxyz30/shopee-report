@@ -13,8 +13,8 @@ app = Flask(__name__)
 app.secret_key = 'kunci-final-yang-super-aman-dan-acak'
 
 # --- KREDENSIAL DEVELOPER (HARDCODED) ---
-PARTNER_ID = 1174779
-PARTNER_KEY = "shpk446b50576c426d7051554246516d42766b53566959466d56524b7649654b"
+PARTNER_ID = 1175054
+PARTNER_KEY = "shpk4b6f515159434376684f416b68774552754d6e714d5976744247796e7573"
 SHOPEE_BASE_URL = "https://partner.test-stable.shopeemobile.com"
 
 # --- FUNGSI BANTU UNTUK SHOPEE API ---
