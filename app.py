@@ -1,3 +1,4 @@
+# app.py
 import os
 import time
 import hmac
@@ -7,32 +8,31 @@ import pandas as pd
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash
 
-# === KONFIGURASI APLIKASI ===
+# Konfigurasi Flask
 app = Flask(__name__)
-app.secret_key = 'kunci-final-super-aman'
+app.secret_key = 'kunci-super-rahasia-acak'
 
+# Kunci Akses Shopee Sandbox (gunakan yang dari developer.shopee)
 PARTNER_ID = 1175054
 PARTNER_KEY = "shpk614464654679696669515152437445795344697a57664176584c44444772"
 SHOPEE_BASE_URL = "https://partner.test-stable.shopeemobile.com"
 REDIRECT_URL = "https://alvinnovendra.pythonanywhere.com/callback"
 
-# === SIGNATURE GENERATOR ===
-def generate_shopee_signature(path, timestamp, redirect_url=None):
+# Fungsi Signature Shopee
+def generate_shopee_signature(path, timestamp, redirect=None):
     base_string = f"{PARTNER_ID}{path}{timestamp}"
-    if redirect_url:
-        base_string += redirect_url
-    print("[SIGN BASE STRING]", base_string)
-    sign = hmac.new(PARTNER_KEY.encode(), base_string.encode(), hashlib.sha256).hexdigest()
-    print("[SIGN]", sign)
+    if redirect:
+        base_string += redirect
+    sign = hmac.new(
+        PARTNER_KEY.encode('utf-8'), base_string.encode('utf-8'), hashlib.sha256
+    ).hexdigest()
     return sign
 
-# === FLASK ROUTE: HOME ===
 @app.route('/')
 def index():
     connected_stores = session.get('connected_stores', {})
     return render_template('index.html', stores=connected_stores)
 
-# === FLASK ROUTE: AUTHORIZE ===
 @app.route('/authorize_shopee')
 def authorize_shopee():
     path = "/api/v2/shop/auth_partner"
@@ -41,14 +41,12 @@ def authorize_shopee():
     auth_url = f"{SHOPEE_BASE_URL}{path}?partner_id={PARTNER_ID}&timestamp={timestamp}&sign={sign}&redirect={REDIRECT_URL}"
     return redirect(auth_url)
 
-# === FLASK ROUTE: CALLBACK ===
 @app.route('/callback')
 def shopee_callback():
     code = request.args.get('code')
     shop_id = request.args.get('shop_id')
-
     if not code or not shop_id:
-        flash("Otorisasi gagal atau dibatalkan.", "error")
+        flash("Gagal otorisasi Shopee.", "error")
         return redirect(url_for('index'))
 
     path = "/api/v2/auth/token/get"
@@ -59,24 +57,27 @@ def shopee_callback():
 
     try:
         response = requests.post(url, json=body)
-        data = response.json()
-        if data.get("error"):
-            flash(f"Gagal mendapatkan token: {data['message']}", "error")
+        token_data = response.json()
+        if token_data.get("error"):
+            flash(f"Gagal mendapatkan token: {token_data.get('message')}", "error")
         else:
-            stores = session.get('connected_stores', {})
-            stores[f"Toko_{shop_id}"] = {
-                "shop_id": int(shop_id),
-                "access_token": data['access_token'],
-                "refresh_token": data['refresh_token']
+            if 'connected_stores' not in session:
+                session['connected_stores'] = {}
+            stores = session['connected_stores']
+            store_name = f"Toko_{shop_id}"
+            stores[store_name] = {
+                'shop_id': int(shop_id),
+                'access_token': token_data['access_token'],
+                'refresh_token': token_data['refresh_token']
             }
             session['connected_stores'] = stores
-            flash(f"Toko {shop_id} berhasil terhubung!", "success")
-    except Exception as e:
-        flash(f"Terjadi error: {e}", "error")
+            flash(f"Toko {store_name} berhasil terhubung!", "success")
+    except requests.exceptions.RequestException as e:
+        flash(f"Error komunikasi dengan API Shopee: {e}", "error")
 
     return redirect(url_for('index'))
 
-# === GET RETURN LIST ===
+# Fungsi untuk ambil return SN
 def get_all_return_sn(shop_id, access_token, from_date, to_date, status):
     path = "/api/v2/returns/get_return_list"
     all_return_sn_list = []
@@ -95,21 +96,22 @@ def get_all_return_sn(shop_id, access_token, from_date, to_date, status):
             params['status'] = status.upper()
         try:
             response = requests.get(url, params=params)
-            response.raise_for_status()
             data = response.json()
             if data.get("error"):
                 return None, data.get("message")
-            return_list = data.get("response", {}).get("return_sn_list", [])
-            all_return_sn_list.extend([r['return_sn'] for r in return_list])
-            if data.get("response", {}).get("more", False):
-                next_cursor = data["response"].get("next_cursor", "")
+            response_data = data.get("response", {})
+            return_list = response_data.get("return_sn_list", [])
+            if return_list:
+                all_return_sn_list.extend([r['return_sn'] for r in return_list])
+            if response_data.get("more", False):
+                next_cursor = response_data.get("next_cursor", "")
             else:
                 break
         except requests.exceptions.RequestException as e:
             return None, str(e)
     return all_return_sn_list, None
 
-# === GET RETURN DETAILS ===
+# Fungsi untuk ambil detail retur
 def get_return_details(shop_id, access_token, return_sn_list):
     path = "/api/v2/return/get_return_detail"
     timestamp = int(time.time())
@@ -118,7 +120,6 @@ def get_return_details(shop_id, access_token, return_sn_list):
     body = {"return_sn": return_sn_list}
     try:
         response = requests.post(url, json=body)
-        response.raise_for_status()
         data = response.json()
         if data.get("error"):
             return None, data.get("message")
@@ -126,7 +127,6 @@ def get_return_details(shop_id, access_token, return_sn_list):
     except requests.exceptions.RequestException as e:
         return None, str(e)
 
-# === GENERATE REPORT ===
 @app.route('/generate_report', methods=['POST'])
 def generate_report():
     store_name = request.form['store_name']
@@ -136,7 +136,7 @@ def generate_report():
 
     store_creds = session.get('connected_stores', {}).get(store_name)
     if not store_creds:
-        flash("Toko tidak ditemukan di sesi. Silakan hubungkan ulang.", "error")
+        flash("Toko tidak ditemukan di sesi.", "error")
         return redirect(url_for('index'))
 
     all_return_details = []
@@ -149,18 +149,17 @@ def generate_report():
         if current_end > end_date:
             current_end = end_date
 
-        flash(f"Menarik data retur dari {current_start.date()} sampai {current_end.date()}...", "info")
-        return_sn_list, error = get_all_return_sn(store_creds['shop_id'], store_creds['access_token'], current_start, current_end, status)
-
+        return_sn_list, error = get_all_return_sn(
+            store_creds['shop_id'], store_creds['access_token'], current_start, current_end, status)
         if error:
-            flash(f"Error saat tarik SN: {error}", "error")
+            flash(f"Gagal tarik daftar retur: {error}", "error")
             return redirect(url_for('index'))
 
         for i in range(0, len(return_sn_list), 50):
-            chunk = return_sn_list[i:i + 50]
-            details, error_detail = get_return_details(store_creds['shop_id'], store_creds['access_token'], chunk)
-            if error_detail:
-                flash(f"Error saat tarik detail: {error_detail}", "error")
+            chunk = return_sn_list[i:i+50]
+            details, err = get_return_details(store_creds['shop_id'], store_creds['access_token'], chunk)
+            if err:
+                flash(f"Gagal ambil detail retur: {err}", "error")
                 continue
             all_return_details.extend(details)
 
@@ -172,49 +171,47 @@ def generate_report():
 
     processed_data = []
     for r in all_return_details:
-        item_info = r.get('item', [{}])[0]
+        item = r.get('item', [{}])[0]
         processed_data.append({
             "Nomor Pesanan": r.get('order_sn'),
-            "Resi Pengembalian": r.get('return_sn'),
-            "Status Retur": r.get('status'),
-            "Alasan Retur": r.get('reason'),
-            "Tanggal Order Dibuat": datetime.fromtimestamp(r.get('create_time')).strftime('%Y-%m-%d %H:%M:%S'),
-            "Metode Pembayaran": r.get('payment_method'),
-            "Resi Pengiriman Asli": r.get('tracking_number'),
+            "Resi Retur": r.get('return_sn'),
+            "Status": r.get('status'),
+            "Alasan": r.get('reason'),
+            "Tanggal Order": datetime.fromtimestamp(r.get('create_time')).strftime('%Y-%m-%d %H:%M:%S'),
+            "Metode Bayar": r.get('payment_method'),
+            "Resi Kirim Asli": r.get('tracking_number'),
             "Nama Pembeli": r.get('user', {}).get('username'),
-            "Nama Barang": item_info.get('item_name'),
-            "SKU": item_info.get('item_sku'),
-            "Jumlah Retur": item_info.get('amount'),
-            "Total Pengembalian Dana": r.get('refund_amount'),
-            "Gambar Bukti": ", ".join(r.get('image', [])),
-            "Update Terakhir": datetime.fromtimestamp(r.get('update_time')).strftime('%Y-%m-%d %H:%M:%S'),
+            "Barang": item.get('item_name'),
+            "SKU": item.get('item_sku'),
+            "Jumlah": item.get('amount'),
+            "Total Refund": r.get('refund_amount'),
+            "Bukti": ", ".join(r.get('image', [])),
+            "Terakhir Update": datetime.fromtimestamp(r.get('update_time')).strftime('%Y-%m-%d %H:%M:%S'),
         })
 
     df = pd.DataFrame(processed_data)
     filename = f"Laporan_Retur_{store_name}_{from_date_str}_sd_{to_date_str}.xlsx"
-    if not os.path.exists('downloads'): os.makedirs('downloads')
+    if not os.path.exists('downloads'):
+        os.makedirs('downloads')
     filepath = os.path.join('downloads', filename)
     df.to_excel(filepath, index=False)
-    session['last_report'] = filename
 
-    flash(f"Laporan berhasil dibuat! {len(processed_data)} data diekspor.", "success")
+    session['last_report'] = filename
+    flash(f"Laporan berhasil diekspor. Jumlah data: {len(df)}", "success")
     return redirect(url_for('index'))
 
-# === DOWNLOAD LAPORAN ===
 @app.route('/download')
 def download_file():
     filename = session.get('last_report')
     if not filename:
-        return "Tidak ada laporan untuk diunduh.", 404
+        return "Tidak ada file.", 404
     return send_file(os.path.join('downloads', filename), as_attachment=True)
 
-# === LOGOUT ===
 @app.route('/logout')
 def logout():
     session.clear()
-    flash("Sesi toko telah dihapus.", "info")
+    flash("Sesi berhasil dihapus.", "info")
     return redirect(url_for('index'))
 
-# === RUN ===
 if __name__ == '__main__':
     app.run(debug=True)
