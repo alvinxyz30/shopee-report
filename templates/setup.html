@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Setup Kredensial Developer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Setup Kredensial Developer Shopee</h1>
+        <p>Masukkan Partner ID dan Partner Key Anda. Informasi ini hanya akan disimpan di sesi browser Anda.</p>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="message {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="post">
+            <div class="form-group">
+                <label for="partner_id">Partner ID:</label>
+                <input type="text" id="partner_id" name="partner_id" required>
+            </div>
+            <div class="form-group">
+                <label for="partner_key">Partner Key:</label>
+                <input type="password" id="partner_key" name="partner_key" required>
+            </div>
+            <button type="submit">Simpan Kredensial</button>
+        </form>
+    </div>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login Toko Shopee</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        .container { max-width: 600px; margin: auto; padding: 2em; border: 1px solid #ccc; border-radius: 5px; }
+        input { width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box; }
+        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Login & Tambah Toko Shopee</h1>
+        <p>Masukkan kredensial untuk setiap toko yang ingin Anda kelola.</p>
+        <form method="post">
+            <label for="store_name">Nama Toko (untuk penanda):</label>
+            <input type="text" id="store_name" name="store_name" required>
+
+            <label for="shop_id">Shop ID:</label>
+            <input type="text" id="shop_id" name="shop_id" required>
+
+            <label for="partner_id">Partner ID:</label>
+            <input type="text" id="partner_id" name="partner_id" required>
+            
+            <label for="partner_key">Partner Key:</label>
+            <input type="password" id="partner_key" name="partner_key" required>
+
+            <label for="access_token">Access Token:</label>
+            <input type="text" id="access_token" name="access_token" required>
+
+            <button type="submit">Tambah & Simpan Toko</button>
+        </form>
+    </div>
+</body>
+</html>
