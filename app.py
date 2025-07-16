@@ -5,24 +5,24 @@ import hmac
 import hashlib
 import requests
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash
 
 # Konfigurasi Flask
 app = Flask(__name__)
 app.secret_key = 'kunci-super-rahasia-acak'
 
-# Kunci Akses Shopee Sandbox (gunakan yang dari developer.shopee)
+# Kunci Akses Shopee Sandbox
 PARTNER_ID = 1175054
 PARTNER_KEY = "shpk614464654679696669515152437445795344697a57664176584c44444772"
 SHOPEE_BASE_URL = "https://partner.test-stable.shopeemobile.com"
 REDIRECT_URL = "https://alvinnovendra.pythonanywhere.com/callback"
 
 # Fungsi Signature Shopee
-def generate_shopee_signature(path, timestamp, redirect=None):
+def generate_shopee_signature(path, timestamp, redirect_url=None):
     base_string = f"{PARTNER_ID}{path}{timestamp}"
-    if redirect:
-        base_string += redirect
+    if redirect_url:
+        base_string += redirect_url
     sign = hmac.new(
         PARTNER_KEY.encode('utf-8'), base_string.encode('utf-8'), hashlib.sha256
     ).hexdigest()
@@ -36,7 +36,7 @@ def index():
 @app.route('/authorize_shopee')
 def authorize_shopee():
     path = "/api/v2/shop/auth_partner"
-    timestamp = int(time.time())
+    timestamp = int(datetime.now(timezone.utc).timestamp())
     sign = generate_shopee_signature(path, timestamp, REDIRECT_URL)
     auth_url = f"{SHOPEE_BASE_URL}{path}?partner_id={PARTNER_ID}&timestamp={timestamp}&sign={sign}&redirect={REDIRECT_URL}"
     return redirect(auth_url)
@@ -50,7 +50,7 @@ def shopee_callback():
         return redirect(url_for('index'))
 
     path = "/api/v2/auth/token/get"
-    timestamp = int(time.time())
+    timestamp = int(datetime.now(timezone.utc).timestamp())
     sign = generate_shopee_signature(path, timestamp)
     url = f"{SHOPEE_BASE_URL}{path}?partner_id={PARTNER_ID}&timestamp={timestamp}&sign={sign}"
     body = {"code": code, "shop_id": int(shop_id)}
@@ -83,7 +83,7 @@ def get_all_return_sn(shop_id, access_token, from_date, to_date, status):
     all_return_sn_list = []
     next_cursor = ""
     while True:
-        timestamp = int(time.time())
+        timestamp = int(datetime.now(timezone.utc).timestamp())
         sign = generate_shopee_signature(path, timestamp)
         url = f"{SHOPEE_BASE_URL}{path}?partner_id={PARTNER_ID}&shop_id={shop_id}&timestamp={timestamp}&sign={sign}&access_token={access_token}"
         params = {
@@ -114,7 +114,7 @@ def get_all_return_sn(shop_id, access_token, from_date, to_date, status):
 # Fungsi untuk ambil detail retur
 def get_return_details(shop_id, access_token, return_sn_list):
     path = "/api/v2/return/get_return_detail"
-    timestamp = int(time.time())
+    timestamp = int(datetime.now(timezone.utc).timestamp())
     sign = generate_shopee_signature(path, timestamp)
     url = f"{SHOPEE_BASE_URL}{path}?partner_id={PARTNER_ID}&shop_id={shop_id}&timestamp={timestamp}&sign={sign}&access_token={access_token}"
     body = {"return_sn": return_sn_list}
