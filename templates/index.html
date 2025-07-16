@@ -2,78 +2,37 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Shopee Report Extractor</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>Shopee Auth Tester</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f4f6f8;}
+        .container { text-align: center; padding: 3em; background-color: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .message { padding: 1em; margin-bottom: 1em; border-radius: 5px; border: 1px solid transparent; }
+        .success { background-color: #d4edda; color: #155724; border-color: #c3e6cb;}
+        .error { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb;}
+        .info { background-color: #cce5ff; color: #004085; border-color: #b8daff;}
+        button { padding: 15px 30px; font-size: 18px; color: white; background-color: #fd5f32; border: none; border-radius: 5px; cursor: pointer; }
+        code { background-color: #e9ecef; padding: 2px 4px; border-radius: 3px; }
+    </style>
 </head>
 <body>
     <div class="container">
-        <a href="{{ url_for('logout') }}" class="logout">Logout & Reset Kredensial</a>
-        <h1>Shopee Report Extractor</h1>
-        <hr>
-
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="message {{ category }}">
-                        {{ message }}
-                        {% if 'berhasil diekspor' in message %}
-                            <p style="margin-top:10px;"><a href="{{ url_for('download_file') }}"><b>Klik di sini untuk mengunduh laporan terakhir</b></a></p>
-                        {% endif %}
-                    </div>
+                    <p class="message {{ category }}">{{ message }}</p>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
-        <h3>Toko Terhubung</h3>
-        {% if stores %}
-            <ul>
-                {% for name, details in stores.items() %}
-                    <li>{{ name }} (Shop ID: {{ details.shop_id }})</li>
-                {% endfor %}
-            </ul>
+        {% if credentials %}
+            <h1>Berhasil Terhubung!</h1>
+            <p>Toko dengan <b>Shop ID: {{ credentials.shop_id }}</b> sudah terhubung.</p>
+            <p><b>Access Token:</b> <code>{{ credentials.access_token[:10] }}...</code></p>
+            <a href="{{ url_for('logout') }}"><button>Reset & Ulangi</button></a>
         {% else %}
-            <p>Belum ada toko yang terhubung.</p>
-        {% endif %}
-        <a href="{{ url_for('authorize_shopee') }}"><button class="connect-btn">Hubungkan Toko Shopee Baru</button></a>
-        
-        <hr style="margin-top: 2em;">
-
-        <h3>Buat Laporan Retur</h3>
-        {% if stores %}
-            <form action="{{ url_for('generate_report') }}" method="post">
-                <div class="form-group">
-                    <label for="store_name">Pilih Toko:</label>
-                    <select id="store_name" name="store_name">
-                        {% for store in stores %}
-                            <option value="{{ store }}">{{ store }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="from_date">Dari Tanggal:</label>
-                    <input type="date" id="from_date" name="from_date" required>
-                </div>
-                <div class="form-group">
-                    <label for="to_date">Sampai Tanggal:</label>
-                    <input type="date" id="to_date" name="to_date" required>
-                </div>
-                <div class="form-group">
-                    <label for="status">Filter Status Retur (Opsional):</label>
-                    <select id="status" name="status">
-                        <option value="ALL">Tarik Semua Status</option>
-                        <option value="REQUESTED">REQUESTED</option>
-                        <option value="ACCEPTED">ACCEPTED</option>
-                        <option value="CANCELLED">CANCELLED</option>
-                        <option value="JUDGING">JUDGING</option>
-                        <option value="CLOSED">CLOSED</option>
-                        <option value="PROCESSING">PROCESSING</option>
-                        <option value="SELLER_DISPUTE">SELLER_DISPUTE</option>
-                    </select>
-                </div>
-                <button type="submit">Tarik Data & Buat Laporan</button>
-            </form>
-        {% else %}
-            <p>Hubungkan setidaknya satu toko untuk bisa membuat laporan.</p>
+            <h1>Tes Koneksi Shopee API</h1>
+            <p>Klik tombol di bawah untuk memulai proses otorisasi.</p>
+            <a href="{{ url_for('authorize') }}"><button>Hubungkan Akun Shopee</button></a>
         {% endif %}
     </div>
 </body>
