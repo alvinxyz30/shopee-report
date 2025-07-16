@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Shopee Report Extractor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <a href="{{ url_for('logout') }}" class="logout">Logout & Reset Kredensial</a>
+        <h1>Shopee Report Extractor</h1>
+        <hr>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="message {{ category }}">
+                        {{ message }}
+                        {% if 'berhasil diekspor' in message %}
+                            <p style="margin-top:10px;"><a href="{{ url_for('download_file') }}"><b>Klik di sini untuk mengunduh laporan terakhir</b></a></p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <h3>Toko Terhubung</h3>
+        {% if stores %}
+            <ul>
+                {% for name, details in stores.items() %}
+                    <li>{{ name }} (Shop ID: {{ details.shop_id }})</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>Belum ada toko yang terhubung.</p>
+        {% endif %}
+        <a href="{{ url_for('authorize_shopee') }}"><button class="connect-btn">Hubungkan Toko Shopee Baru</button></a>
+        
+        <hr style="margin-top: 2em;">
+
+        <h3>Buat Laporan Retur</h3>
+        {% if stores %}
+            <form action="{{ url_for('generate_report') }}" method="post">
+                <div class="form-group">
+                    <label for="store_name">Pilih Toko:</label>
+                    <select id="store_name" name="store_name">
+                        {% for store in stores %}
+                            <option value="{{ store }}">{{ store }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="from_date">Dari Tanggal:</label>
+                    <input type="date" id="from_date" name="from_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="to_date">Sampai Tanggal:</label>
+                    <input type="date" id="to_date" name="to_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="status">Filter Status Retur (Opsional):</label>
+                    <select id="status" name="status">
+                        <option value="ALL">Tarik Semua Status</option>
+                        <option value="REQUESTED">REQUESTED</option>
+                        <option value="ACCEPTED">ACCEPTED</option>
+                        <option value="CANCELLED">CANCELLED</option>
+                        <option value="JUDGING">JUDGING</option>
+                        <option value="CLOSED">CLOSED</option>
+                        <option value="PROCESSING">PROCESSING</option>
+                        <option value="SELLER_DISPUTE">SELLER_DISPUTE</option>
+                    </select>
+                </div>
+                <button type="submit">Tarik Data & Buat Laporan</button>
+            </form>
+        {% else %}
+            <p>Hubungkan setidaknya satu toko untuk bisa membuat laporan.</p>
+        {% endif %}
+    </div>
+</body>
+</html>
