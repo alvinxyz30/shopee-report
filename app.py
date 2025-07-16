@@ -5,6 +5,7 @@ import hashlib
 import json
 from datetime import datetime, timedelta
 import pandas as pd
+import requests
 from flask import (Flask, render_template, request, redirect, url_for, 
                    session, send_file, flash)
 
@@ -19,17 +20,18 @@ SHOPEE_BASE_URL = "https://partner.test-stable.shopeemobile.com"
 
 # --- FUNGSI BANTU UNTUK SHOPEE API ---
 
-def generate_shopee_signature(path, timestamp):
-    """Membuat tanda tangan digital (signature) untuk otentikasi Shopee."""
+def generate_shopee_signature(path, timestamp, redirect_uri=None):
     base_string = f"{PARTNER_ID}{path}{timestamp}"
+    if redirect_uri:
+        base_string += redirect_uri
+    print("Base String:", base_string)  # DEBUG
     sign = hmac.new(
-        PARTNER_KEY.encode('utf-8'), 
-        base_string.encode('utf-8'), 
+        PARTNER_KEY.encode('utf-8'),
+        base_string.encode('utf-8'),
         hashlib.sha256
     ).hexdigest()
+    print("Generated Sign:", sign)  # DEBUG
     return sign
-
-# (Sisa kode di bawah ini sudah disesuaikan untuk menggunakan kredensial yang di-hardcode)
 
 def get_return_details(shop_id, access_token, return_sn_list):
     path = "/api/v2/return/get_return_detail"
@@ -37,7 +39,6 @@ def get_return_details(shop_id, access_token, return_sn_list):
     sign = generate_shopee_signature(path, timestamp)
     url = f"{SHOPEE_BASE_URL}{path}?partner_id={PARTNER_ID}&shop_id={shop_id}&timestamp={timestamp}&sign={sign}&access_token={access_token}"
     body = {"return_sn": return_sn_list}
-    # ... (logika error handling tetap sama) ...
     try:
         response = requests.post(url, json=body)
         response.raise_for_status()
@@ -88,10 +89,11 @@ def index():
 @app.route('/authorize_shopee')
 def authorize_shopee():
     path = "/api/v2/shop/auth_partner"
-    redirect_url = url_for('shopee_callback', _external=True)
+    redirect_url = "https://alvinnovendra.pythonanywhere.com/callback"  # HARUS SAMA PERSIS DENGAN YANG DIDAFTARKAN
     timestamp = int(time.time())
-    sign = generate_shopee_signature(path, timestamp)
+    sign = generate_shopee_signature(path, timestamp, redirect_url)
     auth_url = f"{SHOPEE_BASE_URL}{path}?partner_id={PARTNER_ID}&timestamp={timestamp}&sign={sign}&redirect={redirect_url}"
+    print("Redirecting to:", auth_url)  # DEBUG
     return redirect(auth_url)
 
 @app.route('/callback')
@@ -106,7 +108,7 @@ def shopee_callback():
     sign = generate_shopee_signature(path, timestamp)
     url = f"{SHOPEE_BASE_URL}{path}?partner_id={PARTNER_ID}&timestamp={timestamp}&sign={sign}"
     body = {"code": code, "shop_id": int(shop_id)}
-    
+
     try:
         response = requests.post(url, json=body)
         response.raise_for_status()
@@ -135,7 +137,7 @@ def generate_report():
     from_date_str = request.form['from_date']
     to_date_str = request.form['to_date']
     status = request.form['status']
-    
+
     store_creds = session.get('connected_stores', {}).get(store_name)
     if not store_creds:
         flash("Toko tidak ditemukan di sesi. Silakan hubungkan ulang.", "error")
@@ -144,15 +146,15 @@ def generate_report():
     all_return_details = []
     start_date = datetime.strptime(from_date_str, '%Y-%m-%d')
     end_date = datetime.strptime(to_date_str, '%Y-%m-%d')
-    
+
     current_start = start_date
     while current_start <= end_date:
         current_end = current_start + timedelta(days=89)
         if current_end > end_date: current_end = end_date
-        
+
         flash(f"Menarik daftar retur dari {current_start.date()} sampai {current_end.date()}...", "info")
-        return_sn_list, error = get_all_return_sn(store_creds['shop_id'], store_creds['access_token'], start_date, end_date, status)
-        
+        return_sn_list, error = get_all_return_sn(store_creds['shop_id'], store_creds['access_token'], current_start, current_end, status)
+
         if error:
             flash(f"Error saat menarik daftar retur: {error}", "error")
             return redirect(url_for('index'))
@@ -166,7 +168,7 @@ def generate_report():
                     flash(f"Error saat menarik detail retur: {error_detail}", "error")
                     continue
                 all_return_details.extend(details)
-        
+
         current_start = current_end + timedelta(days=1)
 
     if not all_return_details:
@@ -185,19 +187,21 @@ def generate_report():
             "Metode Pembayaran": r.get('payment_method'),
             "Resi Pengiriman Asli": r.get('tracking_number'),
             "Nama Pembeli": r.get('user', {}).get('username'),
-            "Nama Barang": item_info.get('item_name'), "SKU": item_info.get('item_sku'),
-            "Jumlah Retur": item_info.get('amount'), "Total Pengembalian Dana": r.get('refund_amount'),
+            "Nama Barang": item_info.get('item_name'),
+            "SKU": item_info.get('item_sku'),
+            "Jumlah Retur": item_info.get('amount'),
+            "Total Pengembalian Dana": r.get('refund_amount'),
             "Gambar Bukti": ", ".join(r.get('image', [])),
             "Update Terakhir": datetime.fromtimestamp(r.get('update_time')).strftime('%Y-%m-%d %H:%M:%S'),
         })
-    
+
     df = pd.DataFrame(processed_data)
     filename = f"Laporan_Retur_{store_name}_{from_date_str}_sd_{to_date_str}.xlsx"
     downloads_folder = 'downloads'
     if not os.path.exists(downloads_folder): os.makedirs(downloads_folder)
     filepath = os.path.join(downloads_folder, filename)
     df.to_excel(filepath, index=False)
-    
+
     session['last_report'] = filename
     flash(f"Laporan berhasil dibuat! {len(processed_data)} data diekspor.", "success")
     return redirect(url_for('index'))
@@ -207,7 +211,7 @@ def download_file():
     filename = session.get('last_report')
     if not filename: return "Tidak ada laporan untuk diunduh.", 404
     return send_file(os.path.join('downloads', filename), as_attachment=True)
-    
+
 @app.route('/logout')
 def logout():
     session.clear()
