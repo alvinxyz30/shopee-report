@@ -12,7 +12,7 @@ from flask import (Flask, render_template, request, redirect, url_for,
 app = Flask(__name__)
 app.secret_key = 'ganti-dengan-kunci-rahasia-apapun-yang-panjang-dan-acak'
 
-SHOPEE_BASE_URL = "https://partner.shopeemobile.com"
+SHOPEE_BASE_URL = "https://partner.test-stable.shopeemobile.com"
 
 # ==============================================================================
 # FUNGSI BANTU UNTUK INTERAKSI DENGAN SHOPEE API
